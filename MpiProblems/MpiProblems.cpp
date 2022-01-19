@@ -300,6 +300,7 @@ void CollectiveScatterV(int argc, char** argv)
 
 	MPI_Finalize();
 }
+
 void MpiPackAndUnpackExample(int argc, char** argv)
 {
 	int size;
@@ -338,11 +339,103 @@ void MpiPackAndUnpackExample(int argc, char** argv)
 	MPI_Finalize();
 }
 
-void MPI_VECTOR_CONTIGUOUS(int argc, char** argv)
+void MPI_CONTIGUOUS(int argc, char** argv)
 {
+	int size;
+	int* displ = nullptr;
+	int* scounts = nullptr;
+	int	n = 3;
+
+	int* mat = nullptr;
+	int* recBuffer = (int*)malloc(sizeof(int) * n);
+
+	MPI_Init(&argc, &argv);
+
+	MPI_Comm_size(MPI_COMM_WORLD, &size);
+	MPI_Comm_rank(MPI_COMM_WORLD, &process_rank);
+	MPI_Datatype newType;
+	MPI_Type_contiguous(3, MPI_INT, &newType);
+	MPI_Type_commit(&newType);
+
+	if (process_rank == 0)
+	{
+		mat = new int[9]
+		{
+		  3,4,14,
+		  1,8,9,
+		  2,12,5
+		};
+
+	}
+	MPI_Scatter(&mat[0], 1, newType, recBuffer, 3, MPI_INT, 0, MPI_COMM_WORLD);
+
+	for (int j = 0; j < 3; j++)
+		printf("%d %d\n", recBuffer[j], process_rank);
+
+	MPI_Type_free(&newType);
+	MPI_Finalize();
 
 }
-
+void MPI_Vector(int size, char** argv)
+{
+	int	n = 3;
+	int* recBuffer = (int*)malloc(sizeof(int) * n);
+	int* mat = nullptr;
+	MPI_Datatype newType;
+	MPI_Type_vector(n, 1, n, MPI_INT, &newType);
+	MPI_Type_commit(&newType);
+	if (rank == 0)
+	{
+		mat = new int[n * n]
+		{
+		  3,4,14,
+		  1,8,9,
+		  2,12,5
+		};
+		for (int i = 0; i < size - 1; i++)
+			MPI_Send(&mat[i], 1, newType, i + 1, 0, MPI_COMM_WORLD);
+	}
+	else
+	{
+		MPI_Recv(recBuffer, 3, MPI_INT, 0, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+		for (int j = 0; j < 3; j++)
+			printf("%d %d\n", recBuffer[j], rank);
+	}
+	MPI_Type_free(&newType);
+}
+void MPI_Indexed(int size, char** argv)
+{
+	int	n = 3;
+	int* recBuffer = (int*)malloc(sizeof(int) * n);
+	int* mat = nullptr;
+	if (process_rank == 0)
+	{
+		MPI_Datatype newType;
+		int blockLengths[3], disp[3];
+		for (int i = 0; i < n; i++)
+		{
+			blockLengths[i] = n - i;
+			disp[i] = n * i + i;
+		}
+		MPI_Type_indexed(n, blockLengths, disp, MPI_INT, &newType);
+		MPI_Type_commit(&newType);
+		mat = new int[n * n]
+		{
+		  3,4,14,
+		  1,8,9,
+		  2,12,5
+		};
+		MPI_Send(&mat[0], 1, newType, 1, 0, MPI_COMM_WORLD);
+		MPI_Type_free(&newType);
+	}
+	else
+	{
+		int count = n * (n + 1) / 2;// upper // lower -> n*(n-1)
+		MPI_Recv(recBuffer, count, MPI_INT, 0, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+		for (int j = 0; j < count; j++)
+			printf("%d %d\n", recBuffer[j], rank);
+	}
+}
 void Transposition(double*& B, int size)
 {
 	double temp = 0.0;
@@ -457,6 +550,9 @@ int main(int argc, char** argv)
 	//CollectiveGaterV(argc, argv);
 	//CollectiveScatterV(argc, argv);
 
-	MpiPackAndUnpackExample(argc, argv);
+	//MpiPackAndUnpackExample(argc, argv);
+	//MPI_CONTIGUOUS(argc, argv);
+	MPI_Vector(argc, argv);
+	MPI_Indexed(argc, argv);
 
 }
